@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { CheckCircle, Loader, User, Mail } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle, Loader, User, Phone, MapPin } from 'lucide-react';
 
 interface UserInfo {
   name: string;
-  email: string;
+  whatsapp: string;
+  province: string;
+  city: string;
 }
 
 interface Answers {
@@ -29,7 +31,9 @@ interface Question {
 interface FormData {
   timestamp: string;
   name: string;
-  email: string;
+  whatsapp: string;
+  province: string;
+  city: string;
   q1_budget: number;
   q1_label: string;
   q2_waktu: number;
@@ -46,11 +50,28 @@ interface FormData {
   total_skor: number;
 }
 
+interface Province {
+  id: string;
+  name: string;
+}
+
+interface City {
+  id: string;
+  name: string;
+}
+
 const KuisJalurKorea: React.FC = () => {
   const [userInfo, setUserInfo] = useState<UserInfo>({
     name: '',
-    email: ''
+    whatsapp: '',
+    province: '',
+    city: ''
   });
+  
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [loadingProvinces, setLoadingProvinces] = useState<boolean>(true);
+  const [loadingCities, setLoadingCities] = useState<boolean>(false);
   
   const [answers, setAnswers] = useState<Answers>({
     q1: 0,
@@ -65,6 +86,49 @@ const KuisJalurKorea: React.FC = () => {
   const [showResult, setShowResult] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
+
+  // Fetch provinces on component mount
+  useEffect(() => {
+    fetchProvinces();
+  }, []);
+
+  // Fetch cities when province changes
+  useEffect(() => {
+    if (userInfo.province) {
+      fetchCities(userInfo.province);
+    } else {
+      setCities([]);
+      setUserInfo(prev => ({ ...prev, city: '' }));
+    }
+  }, [userInfo.province]);
+
+  const fetchProvinces = async (): Promise<void> => {
+    try {
+      setLoadingProvinces(true);
+      const response = await fetch('https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json');
+      const data = await response.json();
+      setProvinces(data);
+    } catch (error) {
+      console.error('Error fetching provinces:', error);
+      alert('Gagal memuat data provinsi. Silakan refresh halaman.');
+    } finally {
+      setLoadingProvinces(false);
+    }
+  };
+
+  const fetchCities = async (provinceId: string): Promise<void> => {
+    try {
+      setLoadingCities(true);
+      const response = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${provinceId}.json`);
+      const data = await response.json();
+      setCities(data);
+    } catch (error) {
+      console.error('Error fetching cities:', error);
+      alert('Gagal memuat data kota/kabupaten.');
+    } finally {
+      setLoadingCities(false);
+    }
+  };
 
   const questions: Question[] = [
     {
@@ -147,15 +211,23 @@ const KuisJalurKorea: React.FC = () => {
       alert('Mohon isi nama kamu terlebih dahulu!');
       return;
     }
-    if (!userInfo.email.trim()) {
-      alert('Mohon isi email kamu terlebih dahulu!');
+    if (!userInfo.whatsapp.trim()) {
+      alert('Mohon isi nomor WhatsApp kamu terlebih dahulu!');
+      return;
+    }
+    if (!userInfo.province) {
+      alert('Mohon pilih provinsi kamu terlebih dahulu!');
+      return;
+    }
+    if (!userInfo.city) {
+      alert('Mohon pilih kota/kabupaten kamu terlebih dahulu!');
       return;
     }
     
-    // Validasi email sederhana
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(userInfo.email)) {
-      alert('Format email tidak valid!');
+    // Validasi nomor WhatsApp (hanya angka, minimal 10 digit)
+    const phoneRegex = /^[0-9]{10,15}$/;
+    if (!phoneRegex.test(userInfo.whatsapp.replace(/\D/g, ''))) {
+      alert('Format nomor WhatsApp tidak valid! (10-15 digit)');
       return;
     }
     
@@ -222,7 +294,9 @@ const KuisJalurKorea: React.FC = () => {
       const formData: FormData = {
         timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
         name: userInfo.name,
-        email: userInfo.email,
+        whatsapp: userInfo.whatsapp,
+        province: provinces.find(p => p.id === userInfo.province)?.name || userInfo.province,
+        city: cities.find(c => c.id === userInfo.city)?.name || userInfo.city,
         q1_budget: answers.q1,
         q1_label: getQuestionLabel('q1', answers.q1),
         q2_waktu: answers.q2,
@@ -240,8 +314,7 @@ const KuisJalurKorea: React.FC = () => {
       };
 
       // Kirim ke Google Sheets melalui Google Apps Script Web App
-      // Ganti URL ini dengan URL Google Apps Script Web App Anda
-      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxEXcbhDq-GNB9lCC90XoJp9GU2hSTl_DWyd2_j2DniVEearsLMa9bi0QERLb46D5LKQ/exec';
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzFvNjXqwEFcdnbYtHyX-XIvUP-pmvgm9c5VqdaCSBAbZkynmLgJ-IuQsTh92swXEqtAg/exec';
       
       await fetch(SCRIPT_URL, {
         method: 'POST',
@@ -266,11 +339,12 @@ const KuisJalurKorea: React.FC = () => {
   };
 
   const handleRestart = (): void => {
-    setUserInfo({ name: '', email: '' });
+    setUserInfo({ name: '', whatsapp: '', province: '', city: '' });
     setAnswers({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0 });
     setShowQuestions(false);
     setShowResult(false);
     setSubmitSuccess(false);
+    setCities([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -280,59 +354,49 @@ const KuisJalurKorea: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-3xl mx-auto">
-      {/* Header */}
-<div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-  {/* Logo */}
-  <div className="flex justify-center mb-4">
-    <img
-      src="/src/assets/images/logo.png"
-      alt="Logo Program"
-      className="h-16 md:h-20 object-contain"
-    />
-  </div>
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">
+            Kuis Penentuan Jalur Karier Korea
+          </h1>
 
-  <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">
-    Kuis Penentuan Jalur Karier Korea
-  </h1>
+          <p className="text-gray-600 text-center">
+            Kerjakan kuis ini untuk mengetahui jalur karier yang paling cocok untuk kamu.
+            <br />
+            Waktu: ~5 Menit
+          </p>
 
-  <p className="text-gray-600 text-center">
-    Kerjakan kuis ini untuk mengetahui jalur karier yang paling cocok untuk kamu.
-    <br />
-    Waktu: ~5 Menit
-  </p>
+          {!showQuestions && !showResult && (
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <strong>Petunjuk Skor:</strong><br />
+                1 = sangat tidak siap / sangat minim<br />
+                3 = sedang / cukup tapi perlu dibangun<br />
+                5 = sangat siap / sudah kuat
+              </p>
+            </div>
+          )}
 
-  {!showQuestions && !showResult && (
-    <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-      <p className="text-sm text-gray-700">
-        <strong>Petunjuk Skor:</strong><br />
-        1 = sangat tidak siap / sangat minim<br />
-        3 = sedang / cukup tapi perlu dibangun<br />
-        5 = sangat siap / sudah kuat
-      </p>
-    </div>
-  )}
-
-  {/* Progress Bar */}
-  {showQuestions && !showResult && (
-    <div className="mt-4">
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-sm font-semibold text-gray-700">
-          Progress: {totalAnswered}/{questions.length}
-        </span>
-        <span className="text-sm font-semibold text-indigo-600">
-          {Math.round(progressPercentage)}%
-        </span>
-      </div>
-      <div className="w-full bg-gray-200 rounded-full h-3">
-        <div
-          className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
-          style={{ width: `${progressPercentage}%` }}
-        />
-      </div>
-    </div>
-  )}
-</div>
-
+          {/* Progress Bar */}
+          {showQuestions && !showResult && (
+            <div className="mt-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-semibold text-gray-700">
+                  Progress: {totalAnswered}/{questions.length}
+                </span>
+                <span className="text-sm font-semibold text-indigo-600">
+                  {Math.round(progressPercentage)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* User Info Form */}
         {!showQuestions && !showResult && (
@@ -357,19 +421,69 @@ const KuisJalurKorea: React.FC = () => {
                 />
               </div>
 
-              {/* Email */}
+              {/* WhatsApp */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  <Mail className="inline mr-2" size={18} />
-                  Email
+                  <Phone className="inline mr-2" size={18} />
+                  Nomor WhatsApp
                 </label>
                 <input
-                  type="email"
-                  value={userInfo.email}
-                  onChange={(e) => handleUserInfoChange('email', e.target.value)}
+                  type="tel"
+                  value={userInfo.whatsapp}
+                  onChange={(e) => handleUserInfoChange('whatsapp', e.target.value)}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none transition-colors"
-                  placeholder="contoh@email.com"
+                  placeholder="08xxxxxxxxxx"
                 />
+              </div>
+
+              {/* Provinsi */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <MapPin className="inline mr-2" size={18} />
+                  Provinsi
+                </label>
+                <select
+                  value={userInfo.province}
+                  onChange={(e) => handleUserInfoChange('province', e.target.value)}
+                  disabled={loadingProvinces}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none transition-colors"
+                >
+                  <option value="">
+                    {loadingProvinces ? 'Memuat provinsi...' : 'Pilih Provinsi'}
+                  </option>
+                  {provinces.map(province => (
+                    <option key={province.id} value={province.id}>
+                      {province.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Kota/Kabupaten */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <MapPin className="inline mr-2" size={18} />
+                  Kota/Kabupaten
+                </label>
+                <select
+                  value={userInfo.city}
+                  onChange={(e) => handleUserInfoChange('city', e.target.value)}
+                  disabled={!userInfo.province || loadingCities}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none transition-colors disabled:bg-gray-100"
+                >
+                  <option value="">
+                    {!userInfo.province 
+                      ? 'Pilih provinsi terlebih dahulu' 
+                      : loadingCities 
+                      ? 'Memuat kota/kabupaten...' 
+                      : 'Pilih Kota/Kabupaten'}
+                  </option>
+                  {cities.map(city => (
+                    <option key={city.id} value={city.id}>
+                      {city.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <button
@@ -392,7 +506,7 @@ const KuisJalurKorea: React.FC = () => {
             {/* User Info Display */}
             <div className="bg-white rounded-lg shadow-md p-4">
               <p className="text-sm text-gray-600">
-                <strong>Peserta:</strong> {userInfo.name} ({userInfo.email})
+                <strong>Peserta:</strong> {userInfo.name} | WA: {userInfo.whatsapp} | {provinces.find(p => p.id === userInfo.province)?.name}, {cities.find(c => c.id === userInfo.city)?.name}
               </p>
             </div>
 
@@ -478,7 +592,8 @@ const KuisJalurKorea: React.FC = () => {
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-700">
                   <strong>Peserta:</strong> {userInfo.name}<br/>
-                  <strong>Email:</strong> {userInfo.email}
+                  <strong>WhatsApp:</strong> {userInfo.whatsapp}<br/>
+                  <strong>Lokasi:</strong> {provinces.find(p => p.id === userInfo.province)?.name}, {cities.find(c => c.id === userInfo.city)?.name}
                 </p>
               </div>
 
