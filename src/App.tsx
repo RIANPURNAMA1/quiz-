@@ -47,6 +47,7 @@ interface FormData {
   q6_mental: number;
   q6_label: string;
   rekomendasi_sistem: string;
+  jalur_cadangan: string;
   total_skor: number;
 }
 
@@ -241,34 +242,48 @@ const KuisJalurKorea: React.FC = () => {
     }));
   };
 
-  const calculateResult = (): string => {
+  const calculateResult = (): { primary: string; backup: string } => {
     const { q1, q2, q3, q4, q5, q6 } = answers;
     
-    // Logic penentuan jalur berdasarkan skor
-    let recommendation = '';
+    let primary = '';
+    let backup = '';
+    
+    // Hitung total skor
+    const totalScore = q1 + q2 + q3 + q4 + q5 + q6;
     
     // Jalur Studi/Kuliah
     if (q2 >= 4 && q5 >= 4 && q6 >= 4) {
-      recommendation = 'Jalur Studi/Kuliah';
+      primary = 'Jalur Studi/Kuliah';
+      backup = q4 >= 3 ? 'Jalur Kursus Bahasa' : 'EPS (G-to-G)';
     }
     // Jalur Kursus Bahasa
     else if (q4 >= 4 && q2 >= 3) {
-      recommendation = 'Jalur Kursus Bahasa';
+      primary = 'Jalur Kursus Bahasa';
+      backup = q5 >= 4 ? 'Jalur Studi/Kuliah' : 'EPS (G-to-G)';
     }
     // Jalur Skilled / Direct Hire
     else if (q3 >= 4) {
-      recommendation = 'Jalur Skilled / Direct Hire';
+      primary = 'Jalur Skilled / Direct Hire';
+      backup = q4 >= 3 ? 'Jalur Kursus Bahasa' : 'EPS (G-to-G)';
     }
     // Jalur Musiman
     else if (q2 <= 2 && q5 <= 2) {
-      recommendation = 'Jalur Musiman';
+      primary = 'Jalur Musiman';
+      backup = totalScore >= 15 ? 'EPS (G-to-G)' : 'Jalur Kursus Bahasa';
     }
     // EPS (G-to-G)
     else {
-      recommendation = 'EPS (G-to-G)';
+      primary = 'EPS (G-to-G)';
+      if (q4 >= 3) {
+        backup = 'Jalur Kursus Bahasa';
+      } else if (q3 >= 3) {
+        backup = 'Jalur Skilled / Direct Hire';
+      } else {
+        backup = 'Jalur Musiman';
+      }
     }
     
-    return recommendation;
+    return { primary, backup };
   };
 
   const getQuestionLabel = (qId: keyof Answers, value: number): string => {
@@ -309,12 +324,13 @@ const KuisJalurKorea: React.FC = () => {
         q5_label: getQuestionLabel('q5', answers.q5),
         q6_mental: answers.q6,
         q6_label: getQuestionLabel('q6', answers.q6),
-        rekomendasi_sistem: recommendation,
+        rekomendasi_sistem: recommendation.primary,
+        jalur_cadangan: recommendation.backup,
         total_skor: answers.q1 + answers.q2 + answers.q3 + answers.q4 + answers.q5 + answers.q6
       };
 
       // Kirim ke Google Sheets melalui Google Apps Script Web App
-      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzFvNjXqwEFcdnbYtHyX-XIvUP-pmvgm9c5VqdaCSBAbZkynmLgJ-IuQsTh92swXEqtAg/exec';
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxEXcbhDq-GNB9lCC90XoJp9GU2hSTl_DWyd2_j2DniVEearsLMa9bi0QERLb46D5LKQ/exec';
       
       await fetch(SCRIPT_URL, {
         method: 'POST',
@@ -602,12 +618,24 @@ const KuisJalurKorea: React.FC = () => {
                 Rekomendasi Jalur Kamu
               </h2>
               
-              <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg mb-6 border-2 border-green-200">
+              <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg mb-4 border-2 border-green-200">
                 <p className="text-lg font-semibold text-green-800 mb-2">
-                  Berdasarkan jawaban kamu, jalur yang direkomendasikan:
+                  🎯 Jalur Utama yang Direkomendasikan:
                 </p>
                 <p className="text-3xl font-bold text-green-600">
-                  {calculateResult()}
+                  {calculateResult().primary}
+                </p>
+              </div>
+
+              <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg mb-6 border-2 border-blue-200">
+                <p className="text-lg font-semibold text-blue-800 mb-2">
+                  🔄 Jalur Cadangan (Alternatif):
+                </p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {calculateResult().backup}
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  Jika jalur utama tidak memungkinkan, kamu bisa pertimbangkan jalur ini
                 </p>
               </div>
 
