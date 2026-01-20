@@ -258,7 +258,7 @@ const KuisJalurKorea: React.FC = () => {
     }
     // Jalur Kursus Bahasa
     else if (q4 >= 4 && q2 >= 3) {
-      primary = 'Jalur Kursus Bahasa';
+      primary = 'Jalur Kuliah Bahasa';
       backup = q5 >= 4 ? 'Jalur Studi/Kuliah' : 'EPS (G-to-G)';
     }
     // Jalur Skilled / Direct Hire
@@ -269,13 +269,13 @@ const KuisJalurKorea: React.FC = () => {
     // Jalur Musiman
     else if (q2 <= 2 && q5 <= 2) {
       primary = 'Jalur Musiman';
-      backup = totalScore >= 15 ? 'EPS (G-to-G)' : 'Jalur Kursus Bahasa';
+      backup = totalScore >= 15 ? 'EPS (G-to-G)' : 'Jalur Kuliah Bahasa';
     }
     // EPS (G-to-G)
     else {
       primary = 'EPS (G-to-G)';
       if (q4 >= 3) {
-        backup = 'Jalur Kursus Bahasa';
+        backup = 'Jalur Kuliah Bahasa';
       } else if (q3 >= 3) {
         backup = 'Jalur Skilled / Direct Hire';
       } else {
